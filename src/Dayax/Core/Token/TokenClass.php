@@ -22,11 +22,20 @@ class TokenClass extends TokenScope
 {
     protected $tokenNamespace;
     protected $className = null;
+    
     public function setTokenNamespace(TokenNamespace $token)
     {
         $this->tokenNamespace = $token;
         $ns = (string)$token->getName();        
         $this->className = $ns."\\".$this->getShortName();        
+    }
+    
+    /**
+     * @return Dayax\Core\Token\TokenNamespace
+     */
+    public function getTokenNamespace()
+    {
+        return $this->tokenNamespace;
     }
         
     public function getName()

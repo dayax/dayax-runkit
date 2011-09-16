@@ -17,7 +17,7 @@ use Dayax\Core\Token\Token;
  *
  * @author Anthonius Munthi <toni.dayax@gmail.com>
  */
-class TokenNamespace extends Token
+class TokenNamespace extends TokenScope
 {
     protected $name;
     

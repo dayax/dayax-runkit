@@ -122,8 +122,7 @@ class Compiler
      */
     public function getTokenForClass($name)
     {
-        $classes = $this->stream->getClasses();
-        
+        $classes = $this->stream->getClasses();        
         if(isset($classes[$name])){
             $id = $classes[$name]['id'];
             return $this->stream[$id];
@@ -166,7 +165,8 @@ class Compiler
         $iLines = $this->ignoredLines;
         $sLines = $this->strippedLines;
         $cToken = $this->changedToken;
-        $this->compiled = '';                
+        $this->compiled = '';  
+        
         foreach($this->stream as $id=>$token){
             $type = $token->getType();
             $line = $token->getLine();            

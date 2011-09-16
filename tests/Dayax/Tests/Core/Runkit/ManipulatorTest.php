@@ -15,6 +15,14 @@ use Dayax\Core\Test\TestCase;
 use Dayax\Core\Runkit\Manipulator;
 use Dayax\Core\Token\Stream;
 
+class FooManipulator extends Manipulator
+{
+    static public function getCacheDir()
+    {
+        return parent::$cacheDir;
+    }
+}
+
 /**
  * ClassManipulatorTest class.
  *
@@ -83,8 +91,24 @@ EOC;
         $this->assertEquals('Hello World',$ob->hello());
     }
     
-    public function testNewInstance()
+    /**
+     * @dataProvider getTestNamespaced
+     */
+    public function testNamespaced($file,$class)
     {
-        
+        $m = new Manipulator($class,$file);        
+        $m->useUniqueName();        
+        $m->declareClass();        
+        $this->assertTrue(class_exists($m->getGeneratedName()));        
     }
+    
+    public function getTestNamespaced()
+    {
+        $fixDir = __DIR__.'/fixtures/';
+        return array(
+            array($fixDir.'NamespacedClass.php','Foo\\TestClass'),
+            array($fixDir.'NamespacedClassWithBraces.php','Foo\\TestClass'),
+            array($fixDir.'NamespacedClassWithBraces.php','Bar\\TestClass'),
+        );
+    }        
 }
