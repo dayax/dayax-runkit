@@ -49,7 +49,12 @@ abstract class Token
     public function getLine()
     {
         return $this->line;
-    }        
+    }
+    
+    public function getLineContent()
+    {
+        return $this->stream->getLineContent($this->line);
+    }
     
     public function getType()
     {

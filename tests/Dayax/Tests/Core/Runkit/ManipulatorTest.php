@@ -58,6 +58,16 @@ class ManipulatorTest extends TestCase
         $x = new Manipulator('Hello',__DIR__.'/fixtures/source');
     }            
     
+    /**
+     * @expectedException           Dayax\Core\Runkit\Exception
+     * @expectedExceptionMessage    Can't load class definition
+     */
+    public function testWithFalseSource()
+    {
+        $m = new Manipulator('FooError', __DIR__ . '/fixtures/FooError.php');
+        $m->declareClass();
+    }
+    
     public function testAddMethod()
     {
         $this->m = new Manipulator('CFoo',__DIR__.'/fixtures/CFoo.php');
@@ -97,7 +107,7 @@ EOC;
     public function testNamespaced($file,$class)
     {
         $m = new Manipulator($class,$file);        
-        $m->useUniqueName();        
+        //$m->useUniqueName();    
         $m->declareClass();        
         $this->assertTrue(class_exists($m->getGeneratedName()));        
     }
@@ -110,5 +120,21 @@ EOC;
             array($fixDir.'NamespacedClassWithBraces.php','Foo\\TestClass'),
             array($fixDir.'NamespacedClassWithBraces.php','Bar\\TestClass'),
         );
-    }        
+    }
+    
+    public function testGetReflection()
+    {
+        $r = $this->m->getReflection();
+        $this->assertTrue(is_object($r),'Should return ReflectionClass object');
+        $this->assertEquals('Dayax\\Core\\Runkit\\ReflectionClass',get_class($r),'Should return dayax ReflectionClass');
+        
+        $definition = <<<EOC
+    public function myMethod()
+    {
+    }
+EOC;
+        $this->m->addMethod($definition);
+        $r = $this->m->getReflection();
+        $this->assertTrue($r->hasMethod('myMethod'),'Class now should have myMethod method');
+    }    
 }

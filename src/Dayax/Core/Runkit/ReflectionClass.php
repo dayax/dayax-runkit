@@ -18,5 +18,29 @@ namespace Dayax\Core\Runkit;
  */
 class ReflectionClass extends \ReflectionClass
 {
+    public function __construct($className)
+    {
+        $className = $this->initializeClass($className);
+        parent::__construct($className);
+    }
     
+    protected function initializeClass($className)
+    {
+        if($className instanceof Manipulator){
+            $m = $className;
+        }else{
+            if(class_exists($className,false)){
+                $r = new \ReflectionClass($className);
+                $file = $r->getFileName();
+            }else{
+                $file = \dx::getLoader()->findFile($className);
+            }
+            if(!is_file($file)){
+                throw new Exception('reflection.file_not_found',$className,$file);
+            }
+            $m = new Manipulator($className,$file);
+        }
+        $m->declareClass();
+        return $m->getGeneratedName();
+    }
 }

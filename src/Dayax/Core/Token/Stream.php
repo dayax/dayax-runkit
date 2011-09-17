@@ -61,14 +61,12 @@ class Stream implements \ArrayAccess,  \Countable,  \SeekableIterator
     
     protected $classTokens = array();        
         
-    protected $isParsed = false;
-    
-    
-    static protected $cacheDir = null;
+    protected $isParsed = false;            
     
     private function __construct($fileName)
     {
         $this->sourceFileName = $fileName;
+        $this->source = file($fileName);
         $this->parse();        
     }
     
@@ -281,7 +279,12 @@ EOC;
     {
         $classes = $this->getClasses();
         return isset($classes[$className]);
-    }       
+    }
+    
+    public function getLineContent($line)
+    {
+        return $this->source[$line-1];
+    }
     
     static public function setCacheDir($dir)
     {
@@ -308,25 +311,23 @@ EOC;
             spl_autoload_register(array('Dayax\Core\Token\Stream','autoload'));
         }
         if(!is_file($sourceFile)){
-            throw new Exception('file_unreadable',$fileName);
+            throw new Exception('stream.file_unreadable',$fileName);
         }
-        if(is_dir($cDir = self::$cacheDir)){
-            $file = hash('crc32',dirname($sourceFile)).DIRECTORY_SEPARATOR.basename($sourceFile,'.php').'.meta.class';
-            $cacheFile = $cDir.DIRECTORY_SEPARATOR.$file;
-            clearstatcache();
-            if(!is_file($cacheFile)||(filemtime($sourceFile) >  filemtime($cacheFile))){
-                if(!is_dir($dir = dirname($cacheFile))){
-                    mkdir($dir);
-                }                
-                $ob = new self($sourceFile);                
-                file_put_contents($cacheFile, serialize(array($ob)),LOCK_EX);                
-            }            
-            $data = unserialize(file_get_contents($cacheFile,LOCK_EX));
-            $ob = $data[0];            
-            return $ob;
-        }else{
-            return new self($sourceFile);
-        }        
+        $cDir = \dx::getCacheDir().'/stream';
+        $file = hash('crc32', dirname($sourceFile)) . DIRECTORY_SEPARATOR . basename($sourceFile, '.php') . '.meta.class';
+        $cacheFile = $cDir . DIRECTORY_SEPARATOR . $file;
+        clearstatcache();
+        if (!is_file($cacheFile) || (filemtime($sourceFile) > filemtime($cacheFile))) {
+            if (!is_dir($dir = dirname($cacheFile))) {
+                mkdir($dir,0777,true);
+            }
+            $ob = new self($sourceFile);
+            file_put_contents($cacheFile, serialize(array($ob)), LOCK_EX);
+        }
+        $data = unserialize(file_get_contents($cacheFile, LOCK_EX));
+        $ob = $data[0];
+        
+        return $ob;        
     }
     
     static public function autoload($class)

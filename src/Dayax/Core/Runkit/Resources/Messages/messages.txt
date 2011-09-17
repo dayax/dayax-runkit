@@ -1,4 +1,0 @@
-runkit.file_not_exists = Can't manipulate class "{0}". File "{1}" not exists.
-runkit.class_not_exists = Can't manipulate class "{0}". Class definition not exist in file "{1}".
-
-manipulator.eval_failed = Can't load class definition, there is error with message "{0}" on line {1}. With code {2}

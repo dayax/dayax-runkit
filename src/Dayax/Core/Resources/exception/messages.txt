@@ -1,0 +1,9 @@
+dayax.invalid_cache_dir = Can't set cache directory to "{0}". Please ensure that "{1}" directory is exists.
+dayax.cache_dir_unwritable = Can't set cache directory to "{0}". Please ensure that "{1}" directory is writable.
+dayax.shortcut_invalid_class = Can't register shortcut with "{0}" name. Class "{1}" not exists.
+
+
+manipulator.file_not_exists = Can't manipulate class "{0}". File "{1}" not exists.
+manipulator.class_not_exists = Can't manipulate class "{0}". Class definition not exist in file "{1}".
+
+manipulator.eval_failed = Can't load class definition: "{0}" on line {1}. With code: {2} Please ensure you have define a valid code definition passed to manipulator class .

@@ -11,7 +11,6 @@
 
 namespace Dayax\Core\Runkit;
 
-use Dayax\Core\Runkit\Exception;
 use Dayax\Core\Token\Stream;
 
 /**

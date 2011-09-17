@@ -29,6 +29,8 @@ class Exception extends \Exception
      */
     static protected $cache    = array();
     
+    static protected $untranslatedMessage = array();
+    
     public function __construct($message)
     {
         $this->id = $message;
@@ -48,14 +50,14 @@ class Exception extends \Exception
         return $this->id;
     }
     
-    public function getMessageDir()
+    static public function getMessageDir()
     {
-        return __DIR__ . '/Resources/exception';
+        return \dx::getRootDir().'/src/Dayax/Core/Resources/exception';
     }
     
     protected function getMessageFile()
     {
-        $dir = $this->getMessageDir();
+        $dir = self::getMessageDir();
         if(!file_exists($file=$dir.'/messages.'.DayaxBase::getLanguage().'.txt')){
             $file = $dir.'/messages.txt';
         }
@@ -65,14 +67,67 @@ class Exception extends \Exception
     protected function translateMessage($key)
     {
         $file = $this->getMessageFile();
-        if(!isset(self::$cache[$file]) && is_file($file)){
-            foreach(file($file) as $content){
-                if(trim($content)=='') continue;
-                list($id,$message) = explode('=',$content);
-                self::$cache[$file][trim($id)] = trim($message);
-            }
-        }        
+        
+        if(!isset(self::$cache[$file][$key])){
+            self::$untranslatedMessage[] = $key;
+        }
         return isset(self::$cache[$file][$key]) ? self::$cache[$file][$key]:$key;
-    }            
+    }
     
+    static public function getUntranslatedMessage()
+    {
+        return self::$untranslatedMessage;
+    }
+    
+    static public function factory($namespace)
+    {
+        $eval = <<<EOC
+namespace $namespace;
+
+class Exception extends \Dayax\Core\Exception
+{
+}
+EOC;
+        eval($eval);
+        
+    }   
+    
+    static public function getCachedMessage()
+    {
+        return self::$cache;
+    }
+    static public function readCacheFile()
+    {
+        $cacheFile = \dx::getCacheDir().'/exception.messages.php';        
+        if(is_file($cacheFile)){
+            require_once($cacheFile);
+        }        
+        $finder = \dx::finder()
+                ->name('*.txt')
+                ->in(self::getMessageDir())
+                ->files()
+        ;
+        $flag = false;
+        foreach($finder as $file){
+            $mFile = $file->getRealpath();
+            if (!isset(self::$cache[$mFile]) || (filemtime($mFile) > @filemtime($cacheFile))) {
+                $flag=true;                
+                foreach (file($mFile) as $content) {
+                    if (trim($content) == ''){                                                                                     
+                        continue;
+                    }
+                    list($id,$message) =  explode('=', $content);                    
+                    self::$cache[$mFile][trim($id)] = trim($message);
+                }                
+            }
+        }
+        
+        if($flag){            
+            $data = var_export(self::$cache,true);
+            $tpl = "<?php\n/* generated at: %s*/\nself::\$cache = %s;";
+            $contents = sprintf($tpl,date('Y-m-d h:m:s'),$data);            
+            file_put_contents($cacheFile, $contents, LOCK_EX);
+            chmod($file, 0777);
+        }
+    }
 }

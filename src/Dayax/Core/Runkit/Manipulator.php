@@ -10,8 +10,6 @@
  */
 
 namespace Dayax\Core\Runkit;
-
-use Dayax\Core\Runkit\Exception;
 use Dayax\Core\Token\Stream;
 use Dayax\Core\Runkit\ReflectionClass;
 
@@ -50,7 +48,7 @@ class Manipulator
     
     protected $isDeclared = false;
     
-    protected $useUniqueName = false;
+    protected $useUniqueName = true;
     
     /**
      * @var Dayax\Core\Runkit\Compiler
@@ -61,7 +59,7 @@ class Manipulator
     public function __construct($className, $sourceFile)
     {        
         if(!is_file($sourceFile)){
-            throw new Exception('runkit.file_not_exists',$className,$sourceFile);
+            throw new Exception('manipulator.file_not_exists',$className,$sourceFile);
         }        
         
         $this->c = new Compiler($sourceFile);                
@@ -72,7 +70,7 @@ class Manipulator
         $this->sources = @file($sourceFile);
         $this->sourceFile = $sourceFile;
         if (false===$this->c->getClassDefinition($className)) {
-            throw new Exception('runkit.class_not_exists', $className, $sourceFile);
+            throw new Exception('manipulator.class_not_exists', $className, $sourceFile);
         }
         $this->changeClassName('###CLASS_NAME###');
         $this->configureCompiler();
@@ -84,31 +82,31 @@ class Manipulator
         $cToken = $this->cToken;
         $startLine = $cToken->getLine();
         $endLine = $cToken->getEndLine();
+        
         if(false!==strpos($cToken->getName(),'\\')){
             $nsToken = $cToken->getTokenNamespace();
-            if($nsToken->getLine()>1){
+            if($nsToken->getLine()>1){                
                 $c->ignoreLines(range(1,$nsToken->getLine()-1));
             }            
             if($nsToken->getEndLine()>1){
                 $c->ignoreLines(range($nsToken->getEndLine()+1,count($this->sources)+1));                        
             }
         }
+        // FIXME: how to strip a single classes codes;
+        /*
+        else{
+            if($cToken->getLine()>=1){
+                $c->ignoreLines(range(1,$cToken->getLine()-1));
+            }
+            $c->ignoreLines(range($cToken->getEndLine()+1,count($this->sources)+1));
+            
+        }*/
     }
     
     public function getGeneratedName()
     {
         return $this->generatedName;
-    }
-    
-    static public function setCacheDir($dir)
-    {
-        if(!is_dir($dir)){
-            if(!@mkdir($dir,0777,true)){
-                throw new Exception('manipulator.cache_dir_unwritable');
-            }
-        }
-        self::$cacheDir = $dir;
-    }
+    }    
     
     public function redefineMethod($methodName,$definition)
     {   
@@ -143,39 +141,37 @@ class Manipulator
         return hash('crc32',$text);
     }
     
-    protected function getCacheFileName($file,$line)
+    protected function getCacheFileName($hash)
     {                
-        $dir = self::$cacheDir.DIRECTORY_SEPARATOR.$this->hash(dirname($this->sourceFile)).DIRECTORY_SEPARATOR.basename($this->sourceFile,'.php');
-        $fileName = $this->hash($line.' '.$file.' '.$this->className); 
+        $dir = \dx::getCacheDir().'/manipulator/'.$this->hash(dirname($this->sourceFile)).DIRECTORY_SEPARATOR.basename($this->sourceFile,'.php');
+        $fileName = $this->hash($hash); 
         return $dir.DIRECTORY_SEPARATOR.$fileName.'.meta';
     }
     
     protected function getCache()
     {
         $stack = debug_backtrace();
-        $file = $line = $function = null;
+        $hash = array();
+        $dir = \dx::getRootDir().'/src';          
         for ($i = 0; $i < count($stack); $i++) {
             $cs = $stack[$i];
-            if (isset($cs['file']) && ($cs['file'] !== __FILE__)) {
+            if (false===strpos($cs['file'],$dir)) {
                 $file = $cs['file'];
                 $line = $cs['line'];
                 $function = $cs['function'];
                 break;
             }
         }
-        $cacheFile = $this->getCacheFileName($file, $line);      
+        $hash = $file.' '.$line.' '.$this->className;  
+        $cacheFile = $this->getCacheFileName($hash);        
         if((filemtime($this->sourceFile) >  @filemtime($cacheFile))||(filemtime($file)>  filemtime($cacheFile))){
             if(!is_dir($dir=dirname($cacheFile))){
-                @mkdir($dir,0777,true);
+                mkdir($dir,0777,true);
             }
             $date = date('Y/m/d h:m:s');
             $contents = $this->doCompile();
             $contents = <<<EOC
-/* 
-    generated at: $date
-    Called from file: $file
-    at line: $line    
-*/
+/* generated at: $date */
 $contents
 EOC;
             
@@ -187,12 +183,7 @@ EOC;
     
     protected function compile()
     {
-        if(!is_dir(self::$cacheDir)){            
-            $this->compiled = $this->doCompile();            
-        }else{            
-            $this->compiled = $this->getCache();
-        }
-        
+        $this->compiled = $this->getCache();        
     }
     
     protected function doCompile()
@@ -229,12 +220,29 @@ EOC;
         $this->onEval = true;
         $this->buffer = $buffer;        
         if (false === @eval($buffer)) {
-            throw new Exception("failed to eval \n" . $buffer);
+            $this->renderException();
+            $this->onEval = false;
+            throw $this->renderException();
         }
-        
         $this->onEval = false;
         $this->buffer = '';
         $this->isDeclared = true;
+    }
+    
+    protected function renderException()
+    {
+        /* type message file line */
+        $info = error_get_last();
+        extract($info);
+        $contents = explode("\n", $this->buffer);
+        $eline = (count($contents)>$line+5) ? $line+5:count($contents)-1;
+        $code = '';
+        for($i=$line-5;$i<=$eline;$i++){            
+            $code[]= sprintf("#%3s %-4s",$i+1,$contents[$i]);
+        }
+        $code = implode("\n", $code);
+        $e = new Exception('manipulator.eval_failed',$message,$line,"\n".$code."\n");        
+        return $e;
     }
     
     public function newInstance()
@@ -247,16 +255,17 @@ EOC;
             return $r->newInstanceArgs($args);
         }else{
             return $r->newInstance();
-        }        
+        }
+        
     }
     
     public function shutdown()
     {
-        if(false===$this->onEval){
+        if(!$this->onEval){
             return;
-        }
-        print_r(error_get_last());
-        echo $this->buffer;
+        }        
+        $e= $this->renderException();        
+        throw $e;
     }
             
     public function addMethod($definition)
@@ -291,9 +300,21 @@ EOC;
         return implode("",$texts);
     }
     
-    public function useUniqueName()
+    /**
+     * @param  bool $value
+     * @return Dayax\Core\Runkit\Manipulator 
+     */
+    public function useUniqueName($value=true)
     {
-        $this->useUniqueName = true;      
+        $this->useUniqueName = $value;
         return $this;
+    }
+    
+    /**
+     * @return Dayax\Core\Runkit\ReflectionClass
+     */
+    public function getReflection()
+    {
+        return new ReflectionClass($this);
     }
 }
